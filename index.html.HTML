@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Profissional - Saldo do Copy</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1 {
+            color: #1c2b4d;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* Estilos das Abas */
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #dee2e6;
+            margin-bottom: 25px;
+        }
+        .tab-button {
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #6c757d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-button:hover { color: #0056b3; }
+        .tab-button.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Estilos do Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dashboard-card {
+            background-color: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+        }
+        .dashboard-card .title { font-size: 1rem; color: #555; margin: 0 0 10px 0; }
+        .dashboard-card .value { font-size: 2.2rem; font-weight: 700; color: #0056b3; margin: 0; }
+        .dashboard-card .value-brl { font-size: 1.5rem; font-weight: 600; color: #28a745; margin: 5px 0 0 0; }
+        .dolar-input-group { margin-top: 15px; }
+        .dolar-input-group label { font-size: 0.9rem; color: #666; display: block; margin-bottom: 5px; }
+        .dolar-input-group input { width: 100px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; font-weight: bold; }
+        .chart-container { background-color: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-top: 20px; }
+
+        /* Estilos das Tabelas de Detalhes */
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background-color: #ffffff; border-radius: 8px; border: 1px solid #dee2e6; overflow: hidden; }
+        .card h2 { background-color: #ffc107; color: #333; padding: 10px 15px; margin: 0; font-size: 1.1em; }
+        .card-body { padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e9ecef; }
+        th { font-weight: 600; color: #495057; background-color: #f8f9fa; }
+        .total-row { background-color: #ffc107; font-weight: bold; }
+        .currency-usd::before { content: '$ '; }
+        [contenteditable="true"] { background-color: #fff9e6; border: 1px dashed #ffc107; padding: 4px; outline: none; border-radius: 3px; }
+        .control-buttons { display: flex; justify-content: flex-end; margin-top: 15px; gap: 10px; }
+        button { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        .delete-btn { background-color: #dc3545; }
+        .delete-btn:hover { background-color: #c82333; }
+        .add-row-btn { background-color: #28a745; }
+        .add-row-btn:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Painel de Controle - Copy Trade</h1>
+
+        <div class="tab-nav">
+            <button class="tab-button active" onclick="openTab(event, 'dashboard')">Dashboard</button>
+            <button class="tab-button" onclick="openTab(event, 'details')">Análise Detalhada</button>
+        </div>
+
+        <div id="dashboard" class="tab-content active">
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <p class="title">Saldo Atual Sócios</p>
+                    <p id="db-saldo-usd" class="value">$ 0,00</p>
+                    <p id="db-saldo-brl" class="value-brl">R$ 0,00</p>
+                    <div class="dolar-input-group">
+                        <label for="dolarCotacao">Cotação do Dólar (R$):</label>
+                        <input type="number" id="dolarCotacao" value="5.25" step="0.01" oninput="updateAllBRL()">
+                    </div>
+                </div>
+                <div class="dashboard-card">
+                    <p class="title">Investimento Total Clientes</p>
+                    <p id="db-investimento-usd" class="value">$ 0,00</p>
+                    <p id="db-investimento-brl" class="value-brl">R$ 0,00</p>
+                </div>
+                <div class="dashboard-card">
+                    <p class="title">Comissão do Mês</p>
+                    <p id="db-comissao-usd" class="value">$ 0,00</p>
+                    <p id="db-comissao-brl" class="value-brl">R$ 0,00</p>
+                </div>
+                <div class="dashboard-card">
+                    <p class="title">Clientes Ativos</p>
+                    <p id="db-clientes" class="value">0</p>
+                </div>
+            </div>
+            <div class="chart-container">
+                <h3>Distribuição de Saldo dos Sócios por Conta (USD)</h3>
+                <canvas id="saldoChart"></canvas>
+            </div>
+        </div>
+
+        <div id="details" class="tab-content">
+            <div class="details-grid">
+                <div class="card">
+                    <h2>COPY - CLIENTES E INVESTIMENTO</h2>
+                    <div class="card-body">
+                        <table id="clientesTable">
+                            <thead><tr><th>COPY</th><th style="text-align:right;">CLIENTES</th><th style="text-align:right;">INVESTIMENTO</th><th></th></tr></thead>
+                            <tbody>
+                                <tr><td class="editable-text" contenteditable="false">TOTAL COPIADOS FOREX CANADA</td><td class="editable-number" contenteditable="false">4</td><td class="editable-number currency-usd" contenteditable="false">5853.00</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                                <tr><td class="editable-text" contenteditable="false">TOTAL COPIADOS FOREX CONSERVADOR</td><td class="editable-number" contenteditable="false">11</td><td class="editable-number currency-usd" contenteditable="false">8139.00</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                            </tbody>
+                            <tfoot><tr class="total-row"><td>TOTAL CLIENTES</td><td id="totalClientes">15</td><td id="totalInvestimentoUSD" class="currency-usd">13992.00</td><td></td></tr></tfoot>
+                        </table>
+                        <div class="control-buttons"><button class="add-row-btn" onclick="addClienteRow()">Adicionar</button><button onclick="toggleEdit('clientesTable', this)">Editar</button></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>SALDO ATUAL SÓCIOS</h2>
+                    <div class="card-body">
+                        <table id="contasTable">
+                             <thead><tr><th>CONTAS</th><th style="text-align:right;">SALDO</th><th></th></tr></thead>
+                            <tbody>
+                                <tr><td class="editable-text" contenteditable="false">TURBO</td><td class="editable-number currency-usd" contenteditable="false">60.18</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                                <tr><td class="editable-text" contenteditable="false">POUPANÇA COPIADA</td><td class="editable-number currency-usd" contenteditable="false">199.44</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                                <tr><td class="editable-text" contenteditable="false">FOREX CONSERVADOR</td><td class="editable-number currency-usd" contenteditable="false">184.10</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                                <tr><td class="editable-text" contenteditable="false">POUPANÇA</td><td class="editable-number currency-usd" contenteditable="false">221.79</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td></tr>
+                            </tbody>
+                            <tfoot><tr class="total-row"><td>TOTAL</td><td id="totalSaldo" class="currency-usd">665.51</td><td></td></tr></tfoot>
+                        </table>
+                        <div class="control-buttons"><button class="add-row-btn" onclick="addContaRow()">Adicionar</button><button onclick="toggleEdit('contasTable', this)">Editar</button></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>COMISSÃO PAGA DENTRO DO MÊS</h2>
+                    <div class="card-body">
+                        <table id="comissoesTable">
+                            <tbody>
+                                <tr><td>COMISSÃO PAGA DENTRO DO MÊS</td><td id="comissaoMes" class="editable-number currency-usd" contenteditable="false">229.87</td></tr>
+                                <tr><td>MEDIA COMISSÃO DIA (7 DIAS)</td><td id="mediaComissao" class="currency-usd">32.84</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="control-buttons"><button onclick="toggleEdit('comissoesTable', this)">Editar</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let saldoChartInstance;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        formatInitialValues();
+        updateAllTotals();
+    });
+
+    function openTab(evt, tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        evt.currentTarget.classList.add('active');
+    }
+
+    function formatNumberForDisplay(value, currency = '') {
+        const number = parseFloat(value);
+        if (isNaN(number)) return `${currency}0,00`;
+        return `${currency}${number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function parseValue(text) {
+        if (typeof text !== 'string') text = String(text);
+        const cleanText = text.replace(/[R$\s.]/g, '').replace(',', '.');
+        return parseFloat(cleanText) || 0;
+    }
+
+    function updateAllTotals() {
+        updateClientesTotal();
+        updateContasTotal();
+        updateComissaoMedia();
+        updateDashboard();
+        renderSaldoChart(); // Atualiza o gráfico de barras
+    }
+
+    function updateDashboard() {
+        document.getElementById('db-saldo-usd').innerText = formatNumberForDisplay(parseValue(document.getElementById('totalSaldo').innerText), '$ ');
+        document.getElementById('db-investimento-usd').innerText = formatNumberForDisplay(parseValue(document.getElementById('totalInvestimentoUSD').innerText), '$ ');
+        document.getElementById('db-clientes').innerText = document.getElementById('totalClientes').innerText;
+        document.getElementById('db-comissao-usd').innerText = formatNumberForDisplay(parseValue(document.getElementById('comissaoMes').innerText), '$ ');
+        updateAllBRL();
+    }
+    
+    function updateAllBRL() {
+        const cotacao = parseFloat(document.getElementById('dolarCotacao').value) || 0;
+        const saldoUSD = parseValue(document.getElementById('totalSaldo').innerText);
+        document.getElementById('db-saldo-brl').innerText = formatNumberForDisplay(saldoUSD * cotacao, 'R$ ');
+        const investimentoUSD = parseValue(document.getElementById('totalInvestimentoUSD').innerText);
+        document.getElementById('db-investimento-brl').innerText = formatNumberForDisplay(investimentoUSD * cotacao, 'R$ ');
+        const comissaoUSD = parseValue(document.getElementById('comissaoMes').innerText);
+        document.getElementById('db-comissao-brl').innerText = formatNumberForDisplay(comissaoUSD * cotacao, 'R$ ');
+    }
+    
+    function updateClientesTotal() {
+        const table = document.getElementById('clientesTable').tBodies[0];
+        let totalClientes = 0, totalInvestimento = 0;
+        for (let row of table.rows) {
+            totalClientes += parseInt(parseValue(row.cells[1].innerText));
+            totalInvestimento += parseValue(row.cells[2].innerText);
+        }
+        document.getElementById('totalClientes').innerText = totalClientes;
+        document.getElementById('totalInvestimentoUSD').innerText = formatNumberForDisplay(totalInvestimento);
+    }
+    
+    function updateContasTotal() {
+        const table = document.getElementById('contasTable').tBodies[0];
+        let totalSaldo = 0;
+        for (let row of table.rows) totalSaldo += parseValue(row.cells[1].innerText);
+        document.getElementById('totalSaldo').innerText = formatNumberForDisplay(totalSaldo);
+    }
+
+    function updateComissaoMedia() {
+        const comissaoMes = parseValue(document.getElementById('comissaoMes').innerText);
+        document.getElementById('mediaComissao').innerText = formatNumberForDisplay(comissaoMes / 7);
+    }
+
+    function formatInitialValues() {
+        document.querySelectorAll('.currency-usd').forEach(cell => {
+            cell.textContent = formatNumberForDisplay(cell.textContent);
+        });
+    }
+
+    function toggleEdit(tableId, button) {
+        const isEditing = button.innerText === 'Salvar';
+        button.innerText = isEditing ? 'Editar' : 'Salvar';
+        document.querySelectorAll(`#${tableId} [contenteditable]`).forEach(cell => cell.contentEditable = !isEditing);
+        if (isEditing) updateAllTotals();
+    }
+
+    function deleteRow(btn) {
+        if (confirm('Tem certeza?')) {
+            btn.closest('tr').remove();
+            updateAllTotals();
+        }
+    }
+
+    function addClienteRow() {
+        const newRow = document.getElementById('clientesTable').tBodies[0].insertRow();
+        newRow.innerHTML = `<td class="editable-text" contenteditable="true">NOVO CLIENTE</td><td class="editable-number" contenteditable="true">0</td><td class="editable-number currency-usd" contenteditable="true">0.00</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td>`;
+    }
+
+    function addContaRow() {
+        const newRow = document.getElementById('contasTable').tBodies[0].insertRow();
+        newRow.innerHTML = `<td class="editable-text" contenteditable="true">NOVA CONTA</td><td class="editable-number currency-usd" contenteditable="true">0.00</td><td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td>`;
+    }
+
+    // --- RENDERIZAÇÃO DO NOVO GRÁFICO DE BARRAS ---
+    function renderSaldoChart() {
+        const ctx = document.getElementById('saldoChart').getContext('2d');
+        const labels = [], data = [];
+        
+        // Coleta os dados da tabela de Saldo dos Sócios
+        document.querySelectorAll('#contasTable tbody tr').forEach(row => {
+            labels.push(row.cells[0].innerText);
+            data.push(parseValue(row.cells[1].innerText));
+        });
+
+        if (saldoChartInstance) saldoChartInstance.destroy();
+
+        saldoChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { 
+                labels, 
+                datasets: [{
+                    label: 'Saldo em USD',
+                    data,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 159, 64, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)'
+                    ],
+                    borderWidth: 1
+                }] 
+            },
+            options: {
+                responsive: true,
+                indexAxis: 'y', // Coloca as barras na horizontal para melhor leitura
+                scales: { 
+                    x: { 
+                        beginAtZero: true,
+                        ticks: { callback: value => '$ ' + value.toLocaleString('pt-BR') } 
+                    } 
+                },
+                plugins: { 
+                    legend: { display: false }, // Legenda é desnecessária com apenas 1 dataset
+                    tooltip: { callbacks: { label: context => `${context.label}: ${formatNumberForDisplay(context.parsed.x, '$ ')}` } } 
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
